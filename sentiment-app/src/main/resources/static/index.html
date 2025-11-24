@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sentiment Analyzer</title>
+    <style>
+        :root { color-scheme: light dark; }
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; }
+        .container { max-width: 720px; margin: 0 auto; }
+        h1 { font-size: 1.6rem; margin-bottom: 0.5rem; }
+        p.help { color: #666; margin-top: 0; }
+        textarea { width: 100%; min-height: 120px; padding: 0.75rem; font-size: 1rem; }
+        button { margin-top: 0.75rem; padding: 0.6rem 1rem; font-size: 1rem; cursor: pointer; }
+        .row { margin-top: 1rem; }
+        .result { padding: 0.75rem; border-radius: 6px; border: 1px solid #ccc; }
+        .badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 999px; font-weight: 600; }
+        .ok { background: #e6ffed; color: #065f46; border: 1px solid #a7f3d0; }
+        .warn { background: #fff7ed; color: #7c2d12; border: 1px solid #fed7aa; }
+        .err { background: #fee2e2; color: #7f1d1d; border: 1px solid #fecaca; }
+        .muted { color: #666; font-style: italic; }
+        .footer { margin-top: 2rem; font-size: 0.9rem; color: #666; }
+        .loading { opacity: 0.7; pointer-events: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Sentiment Analyzer</h1>
+    <p class="help">Enter some text and click Analyze to call the API at <code>/api/sentiment</code>.</p>
+
+    <label for="text">Text</label>
+    <textarea id="text" placeholder="Type something like: I love working with Spring Boot!" >I love working with Spring Boot!</textarea>
+    <div>
+        <button id="analyzeBtn">Analyze</button>
+        <button id="sampleBtn" title="Fill with a sample text">Sample</button>
+    </div>
+
+    <div class="row">
+        <div id="status" class="muted">Idle</div>
+    </div>
+
+    <div class="row">
+        <div id="output" class="result muted">No analysis yet.</div>
+    </div>
+
+    <div class="footer">
+        Tips:
+        <ul>
+            <li>The endpoint expects GET /api/sentiment?text=... and returns JSON like {"sentiment":"positive"}.</li>
+            <li>This page is served by Spring Boot from resources/static.</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+    const textEl = document.getElementById('text');
+    const analyzeBtn = document.getElementById('analyzeBtn');
+    const sampleBtn = document.getElementById('sampleBtn');
+    const outputEl = document.getElementById('output');
+    const statusEl = document.getElementById('status');
+
+    function setLoading(isLoading) {
+        if (isLoading) {
+            statusEl.textContent = 'Calling /api/sentiment ...';
+            document.body.classList.add('loading');
+        } else {
+            document.body.classList.remove('loading');
+        }
+    }
+
+    function renderSentiment(sentiment) {
+        const badgeClass = sentiment === 'positive' ? 'ok' : (sentiment === 'negative' ? 'err' : 'warn');
+        outputEl.classList.remove('muted');
+        outputEl.innerHTML = `Result: <span class="badge ${badgeClass}">${sentiment}</span>`;
+    }
+
+    async function analyze() {
+        const text = textEl.value.trim();
+        if (!text) {
+            statusEl.textContent = 'Please enter some text first.';
+            outputEl.classList.add('muted');
+            outputEl.textContent = 'No analysis yet.';
+            return;
+        }
+        setLoading(true);
+        try {
+            const url = `/api/sentiment?text=${encodeURIComponent(text)}`;
+            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
+            const data = await res.json();
+            statusEl.textContent = 'Success';
+            renderSentiment(data.sentiment ?? 'unknown');
+        } catch (err) {
+            statusEl.textContent = 'Error calling API';
+            outputEl.classList.remove('muted');
+            outputEl.innerHTML = `<span class="badge err">Request failed</span><br/><small>${(err && err.message) || err}</small>`;
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    analyzeBtn.addEventListener('click', analyze);
+    sampleBtn.addEventListener('click', () => {
+        textEl.value = 'Spring Boot makes building APIs a joy!';
+        textEl.focus();
+    });
+
+    // If there is a ?text= query in the browser URL, auto-run analysis
+    const params = new URLSearchParams(window.location.search);
+    const preset = params.get('text');
+    if (preset) {
+        textEl.value = preset;
+        analyze();
+    }
+</script>
+</body>
+</html>
